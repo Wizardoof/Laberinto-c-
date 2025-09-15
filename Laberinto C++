@@ -1,0 +1,323 @@
+
+// - Generador aleatorio (DFS backtracker) que produce laberintos conectados
+// - Entrada en esquina superior izquierda (0,0), salida en esquina inferior derecha (n-1,n-1)
+// - Resolutor automático (BFS) que encuentra el camino más corto
+// - Tamaño configurable por línea de comandos (parámetro 1)
+// - Semilla opcional por línea de comandos (parámetro 2) para reproducibilidad
+// - Medición de tiempos para generación y resolución
+// - Visualización ASCII: '#' muros, '*' caminos, 'o' camino solución, 'E' entrada, 'S' salida
+
+#include <iostream>    // cout, cin
+#include <vector>      // vector (matrices dinámicas)
+#include <stack>       // stack (para el generador DFS no recursivo)
+#include <queue>       // queue (para BFS)
+#include <ctime>       // time() para semilla
+#include <cstdlib>     // srand(), rand(), atoi()
+#include <chrono>      // medir tiempo (high_resolution_clock)
+#include <string>      // stoi (parsing)
+#include <exception>   // excepciones para parsing
+#include <algorithm>   // <-- agregar esto (contiene std::reverse)
+
+
+using namespace std;
+using namespace chrono;
+
+// ===== CONSTANTES VISUALES =====
+const char MURO    = '#';  // muro
+const char CAMINO  = '*';  // camino libre (todos los caminos visibles como '*')
+const char SOLUCION = 'o'; // símbolo que usaremos para marcar la solución sobre los caminos
+const char ENTRADA = 'E';  // entrada (esquina superior izquierda)
+const char SALIDA  = 'S';  // salida  (esquina inferior derecha)
+
+// ===== ESTRUCTURA POSICION =====
+// Guarda coordenadas x (columna) e y (fila)
+struct Posicion {
+    int x, y;
+    Posicion(int _x = -1, int _y = -1) : x(_x), y(_y) {}
+};
+
+// ===== CLASE LABERINTO =====
+class Laberinto {
+private:
+    int tamano;                             // número de filas y columnas (cuadrado)
+    vector<vector<char>> grid;              // matriz de caracteres (grid[y][x])
+    Posicion entrada, salida;               // coordenadas de entrada y salida
+    vector<Posicion> solucion;              // camino solución reconstruido por BFS
+
+public:
+    // Constructor: crea una matriz tam x tam llena de muros
+    Laberinto(int tam = 10) : tamano(tam), grid(tam, vector<char>(tam, MURO)), entrada(-1,-1), salida(-1,-1) {}
+
+    // Reinicia la cuadrícula (todos muros) y borra solución y posiciones
+    void limpiar() {
+        for (int i = 0; i < tamano; ++i) {
+            for (int j = 0; j < tamano; ++j) {
+                grid[i][j] = MURO;
+            }
+        }
+        solucion.clear();
+        entrada = Posicion(-1, -1);
+        salida  = Posicion(-1, -1);
+    }
+
+    // Generador: DFS backtracker (no recursivo)
+    // Trabajamos con la convención: celdas "validas" en coordenadas impares (1,1), (1,3), ...
+    // Esto nos permite mantener muros entre pasillos y producir un "perfect maze" (sin ciclos) que conecta todas las celdas.
+    void generar() {
+        // Empezamos desde todo muro
+        limpiar();
+
+        // Si el tamaño es muy pequeño, garantizar mínimo 3x3
+        if (tamano < 3) return;
+
+        // Pila para backtracking
+        stack<Posicion> pila;
+
+        // Posición inicial dentro de la malla (1,1) — evita los bordes
+        Posicion inicio(1,1);
+        grid[inicio.y][inicio.x] = CAMINO; // marcar como camino
+        pila.push(inicio);
+
+        // Desplazamientos a 2 celdas para saltar muros intermedios
+        int dx[4] = {0, 2, 0, -2};   // derecha/izquierda en pasos de 2
+        int dy[4] = {-2, 0, 2, 0};   // arriba/abajo en pasos de 2
+
+        while (!pila.empty()) {
+            Posicion actual = pila.top();
+
+            // recolectar direcciones válidas (vecinos a 2 celdas que sean muros)
+            vector<int> direcciones;
+            for (int i = 0; i < 4; ++i) {
+                int nx = actual.x + dx[i];
+                int ny = actual.y + dy[i];
+                if (nx > 0 && nx < tamano-1 && ny > 0 && ny < tamano-1) {
+                    if (grid[ny][nx] == MURO) {
+                        direcciones.push_back(i);
+                    }
+                }
+            }
+
+            if (!direcciones.empty()) {
+                // elegir una dirección aleatoria de las válidas
+                int idx = direcciones[rand() % direcciones.size()];
+                int nx = actual.x + dx[idx];
+                int ny = actual.y + dy[idx];
+
+                // marcaremos la celda destino como camino
+                grid[ny][nx] = CAMINO;
+                // romper el muro entre actual y destino (celda intermedia)
+                grid[actual.y + dy[idx]/2][actual.x + dx[idx]/2] = CAMINO;
+
+                // avanzar
+                pila.push(Posicion(nx, ny));
+            } else {
+                // retroceder
+                pila.pop();
+            }
+        }
+
+        // MARCAR ENTRADA Y SALIDA en las esquinas y asegurar que se conecten al interior
+        grid[0][0] = ENTRADA;                       // esquina superior izquierda
+        grid[tamano-1][tamano-1] = SALIDA;          // esquina inferior derecha
+
+        // Abrir celdas vecinas para conectar las esquinas al interior del laberinto
+        if (tamano > 1) {
+            // derecho y abajo de la esquina superior
+            grid[0][1] = CAMINO;
+            grid[1][0] = CAMINO;
+            // izquierdo y arriba de la esquina inferior
+            grid[tamano-1][tamano-2] = CAMINO;
+            grid[tamano-2][tamano-1] = CAMINO;
+        }
+
+        // Guardar coordenadas en atributos
+        entrada = Posicion(0,0);
+        salida  = Posicion(tamano-1, tamano-1);
+    }
+
+    // Mostrar la matriz por consola (sin solución)
+    void mostrar() const {
+        cout << "\n--- LABERINTO (" << tamano << "x" << tamano << ") ---\n";
+        for (int i = 0; i < tamano; ++i) {
+            for (int j = 0; j < tamano; ++j) {
+                char c = grid[i][j];
+                // imprimir directamente (puedes añadir colores si tu terminal los soporta)
+                cout << c << ' ';
+            }
+            cout << '\n';
+        }
+        cout << "---------------------------\n";
+    }
+
+    // Resolver: BFS que encuentra el camino más corto desde entrada a salida
+    bool resolver() {
+        // Comprobación básica
+        if (entrada.x < 0 || salida.x < 0) {
+            cout << "Error: entrada o salida no definidas. Genera el laberinto primero.\n";
+            return false;
+        }
+
+        vector<vector<bool>> visitado(tamano, vector<bool>(tamano, false));
+        vector<vector<Posicion>> padre(tamano, vector<Posicion>(tamano, Posicion(-1,-1)));
+
+        queue<Posicion> cola;
+        cola.push(entrada);
+        visitado[entrada.y][entrada.x] = true;
+
+        // movimientos 4-direcciones
+        int dx[4] = {0, 1, 0, -1};
+        int dy[4] = {-1, 0, 1, 0};
+
+        bool encontrado = false;
+
+        while (!cola.empty() && !encontrado) {
+            Posicion actual = cola.front(); cola.pop();
+
+            // si llegamos a la salida, terminamos
+            if (actual.x == salida.x && actual.y == salida.y) {
+                encontrado = true;
+                break;
+            }
+
+            // explorar vecinos
+            for (int i = 0; i < 4; ++i) {
+                int nx = actual.x + dx[i];
+                int ny = actual.y + dy[i];
+                if (nx >= 0 && nx < tamano && ny >= 0 && ny < tamano) {
+                    char contenido = grid[ny][nx];
+                    // podemos movernos si es CAMINO, o si es la SALIDA o la ENTRADA
+                    if (!visitado[ny][nx] && (contenido == CAMINO || contenido == SALIDA || contenido == ENTRADA)) {
+                        visitado[ny][nx] = true;
+                        padre[ny][nx] = actual;
+                        cola.push(Posicion(nx, ny));
+                    }
+                }
+            }
+        }
+
+        if (!encontrado) {
+            cout << "❌ No se encontró solución.\n";
+            return false;
+        }
+
+        // Reconstruir camino desde salida hasta entrada usando 'padre'
+        solucion.clear();
+        Posicion actual = salida;
+        while (!(actual.x == entrada.x && actual.y == entrada.y)) {
+            solucion.push_back(actual);
+            actual = padre[actual.y][actual.x];
+        }
+        solucion.push_back(entrada); // incluir la entrada al final
+
+        // la lista 'solucion' está en orden salida->entrada; si quieres entrada->salida puedes invertirla
+        reverse(solucion.begin(), solucion.end());
+
+        cout << "✅ Solución encontrada. Longitud: " << solucion.size() << "\n";
+        return true;
+    }
+
+    // Mostrar laberinto con la solución superpuesta
+    void mostrarConSolucion() {
+        if (solucion.empty()) {
+            cout << "No hay solución almacenada. Ejecuta resolver() primero.\n";
+            return;
+        }
+
+        // Copia temporal para no modificar grid original
+        vector<vector<char>> temp = grid;
+
+        // Marcar camino (sin sobrescribir E y S)
+        for (const auto &p : solucion) {
+            if ((p.x == entrada.x && p.y == entrada.y) || (p.x == salida.x && p.y == salida.y)) continue;
+            if (temp[p.y][p.x] == CAMINO) temp[p.y][p.x] = SOLUCION;
+        }
+
+        // Imprimir la copia
+        cout << "\n--- LABERINTO CON SOLUCIÓN ---\n";
+        for (int i = 0; i < tamano; ++i) {
+            for (int j = 0; j < tamano; ++j) {
+                cout << temp[i][j] << ' ';
+            }
+            cout << '\n';
+        }
+        cout << "---------------------------\n";
+    }
+
+    // Getters útiles
+    int getTamano() const { return tamano; }
+};
+
+// ===== FUNCIONES AUXILIARES =====
+void printUsage(const string &prog) {
+    cout << "Uso: " << prog << " [tamano] [semilla]\n";
+    cout << "  tamano  : tamaño del laberinto (impar >= 5). Por defecto 10.\n";
+    cout << "  semilla : entero opcional para reproducir el mismo laberinto. Por defecto time().\n";
+}
+
+// ===== MAIN =====
+int main(int argc, char* argv[]) {
+    // Parámetros por defecto
+    int tam = 10;                       // tamaño por defecto
+    unsigned int seed = static_cast<unsigned int>(time(nullptr)); // semilla por defecto
+
+    // Parsear argumentos
+    if (argc >= 2) {
+        try {
+            tam = stoi(argv[1]);
+        } catch (exception &e) {
+            cout << "Argumento de tamaño inválido.\n";
+            printUsage(argv[0]);
+            return 1;
+        }
+    }
+    if (argc >= 3) {
+        try {
+            seed = static_cast<unsigned int>(stoul(argv[2]));
+        } catch (exception &e) {
+            cout << "Argumento de semilla inválido; usando time()\n";
+        }
+    }
+
+    // Normalizaciones y validaciones
+    if (tam < 5) {
+        cout << "Tamaño demasiado pequeño; usando 5.\n";
+        tam = 5;
+    }
+    if (tam % 2 == 0) {
+        cout << "Tamaño par detectado; incrementando a " << (tam + 1) << " para mantener impar.\n";
+        tam += 1; // forzar impar
+    }
+
+    // Inicializar aleatoriedad
+    srand(seed);
+    cout << "Semilla usada: " << seed << "\n";
+
+    // Crear laberinto
+    Laberinto lab(tam);
+
+    // Medir tiempo de generación
+    auto tg0 = high_resolution_clock::now();
+    lab.generar();
+    auto tg1 = high_resolution_clock::now();
+    auto gen_ms = duration_cast<milliseconds>(tg1 - tg0).count();
+
+    cout << "Generado laberinto " << tam << "x" << tam << " en " << gen_ms << " ms\n";
+
+    // Mostrar laberinto (sin solución)
+    lab.mostrar();
+
+    // Medir tiempo de resolución
+    auto ts0 = high_resolution_clock::now();
+    bool ok = lab.resolver();
+    auto ts1 = high_resolution_clock::now();
+    auto sol_ms = duration_cast<milliseconds>(ts1 - ts0).count();
+
+    cout << "Resolución: " << (ok ? "exitosa" : "fallida") << ", tiempo: " << sol_ms << " ms\n";
+
+    if (ok) {
+        lab.mostrarConSolucion();
+    }
+
+    cout << "\nFin del programa.\n";
+    return 0;
+}
