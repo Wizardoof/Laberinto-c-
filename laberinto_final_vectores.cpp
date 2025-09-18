@@ -35,9 +35,9 @@ public: // se puede usar en cualquier parte del codigo
     Laberinto(int tam=11):n(tam),grid(tam,vector<char>(tam,MURO)) {}
 
     // ================= GENERAR LABERINTO CON DFS =================
-    void generar() {
+    void generar() {  //DFS: explorar → marcar camino → ir profundo → si no hay más → retroceder( lo que hace DFS)
         stack<Pos> pila;                  // pila para backtracking (DFS no recursivo)
-        Pos inicio(1,1);                  // celda inicial dentro de la malla (evita bordes)
+        Pos inicio(1,1);                  // celda inicial dentro de la malla (evita bordes).
         grid[inicio.y][inicio.x]=CAMINO;  // marcar inicio como camino
         pila.push(inicio);                // colocar inicio en la pila
 
@@ -93,10 +93,11 @@ public: // se puede usar en cualquier parte del codigo
     }
 
     // ================= RESOLVER LABERINTO CON BFS =================
-    bool resolver() {
+    bool resolver() {   //BFS = camino más corto de entrada a salida, que luego se puede mostrar con SOLUCION.
         queue<Pos> cola;                           // cola para BFS
         vector<vector<bool>> visitado(n,vector<bool>(n,false));   // matriz de visitados
         vector<vector<Pos>> padre(n,vector<Pos>(n));              // matriz de padres para reconstruir camino
+        //La Matriz de padres Permite reconstruir el camino encontrado por BFS.
 
         cola.push(entrada); 
         visitado[entrada.y][entrada.x]=true;
