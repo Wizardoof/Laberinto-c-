@@ -30,7 +30,7 @@ class Laberinto {
     Pos entrada, salida;             // coordenadas de inicio y fin
     vector<Pos> solucion;            // camino encontrado por BFS
 
-public:
+public: // se puede usar en cualquier parte del codigo 
     // Constructor: crea un laberinto lleno de muros
     Laberinto(int tam=11):n(tam),grid(tam,vector<char>(tam,MURO)) {}
 
