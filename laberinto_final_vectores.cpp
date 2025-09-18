@@ -96,8 +96,8 @@ public: // se puede usar en cualquier parte del codigo
     bool resolver() {   //BFS = camino más corto de entrada a salida, que luego se puede mostrar con SOLUCION.
         queue<Pos> cola;                           // cola para BFS
         vector<vector<bool>> visitado(n,vector<bool>(n,false));   // matriz de visitados
-        vector<vector<Pos>> padre(n,vector<Pos>(n));              // matriz de padres para reconstruir camino
-        //La Matriz de padres Permite reconstruir el camino encontrado por BFS.
+        vector<vector<Pos>> padre(n,vector<Pos>(n));              //“matriz padre” = matriz principal
+        //La Matriz padre Permite reconstruir el camino encontrado por BFS.
 
         cola.push(entrada); 
         visitado[entrada.y][entrada.x]=true;
