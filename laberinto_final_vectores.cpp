@@ -7,14 +7,14 @@
 #include <cstdlib>    // para rand(), srand()
 #include <ctime>      // para time() (semilla aleatoria)
 #include <algorithm>  // para reverse() (invertir camino)
-using namespace std;  // para usar std repetidamente 
+using namespace std;  // evita escribir "std::" en cada instrucción
 
 // ======================= CARACTERES DEL LABERINTO =======================
-const char MURO = '#';      // representa una pared
-const char CAMINO = '*';    // representa un espacio libre
-const char SOLUCION = 'o';  // marca el camino encontrado por BFS
-const char ENTRADA = 'E';   // celda de inicio (arriba a la izquierda)
-const char SALIDA = 'S';    // celda de salida (abajo a la derecha)
+const char MURO     = '#';   // representa una pared
+const char CAMINO   = '*';   // representa un espacio libre
+const char SOLUCION = 'o';   // marca el camino encontrado por BFS
+const char ENTRADA  = 'E';   // celda de inicio (arriba a la izquierda)
+const char SALIDA   = 'S';   // celda de salida (abajo a la derecha)
 
 // ======================= ESTRUCTURA POSICIÓN =======================
 // Guarda una coordenada (x,y) dentro del laberinto
@@ -29,8 +29,8 @@ class Laberinto {
     vector<vector<char>> grid;       // matriz de caracteres que lo representa
     Pos entrada, salida;             // coordenadas de inicio y fin
     vector<Pos> solucion;            // camino encontrado por BFS
+
 public:
-    //accesible desde cualquier parte del programa.
     // Constructor: crea un laberinto lleno de muros
     Laberinto(int tam=11):n(tam),grid(tam,vector<char>(tam,MURO)) {}
 
@@ -39,36 +39,42 @@ public:
         stack<Pos> pila;                  // pila para backtracking (DFS no recursivo)
         Pos inicio(1,1);                  // celda inicial dentro de la malla (evita bordes)
         grid[inicio.y][inicio.x]=CAMINO;  // marcar inicio como camino
-        pila.push(inicio);                 // colocar inicio en la pila
+        pila.push(inicio);                // colocar inicio en la pila
 
         // Movimientos posibles: 4 direcciones (saltando 2 celdas para dejar muros intermedios)
-        int dx[4]={0,2,0,-2}; // derecha, abajo, izquierda, arriba (x)
-        int dy[4]={-2,0,2,0}; // arriba, derecha, abajo, izquierda (y)
+        int movX[4]={0,2,0,-2}; // desplazamientos en X
+        int movY[4]={-2,0,2,0}; // desplazamientos en Y
 
         // Bucle principal DFS
         while(!pila.empty()){
-            Pos a=pila.top(); // celda actual
-            vector<int> dirs; // direcciones válidas a explorar
+            Pos actual=pila.top();     // celda actual
+            vector<int> direcciones;   // direcciones válidas a explorar
 
             // Buscar vecinos a 2 pasos que sean muros (no visitados)
             for(int i=0;i<4;i++){
-                int nx=a.x+dx[i], ny=a.y+dy[i];
-                if(nx>0 && ny>0 && nx<n-1 && ny<n-1 && grid[ny][nx]==MURO)
-                    dirs.push_back(i); // guardar dirección válida
+                int nuevaX=actual.x+movX[i];
+                int nuevaY=actual.y+movY[i];
+
+                if(nuevaX>0 && nuevaY>0 && nuevaX<n-1 && nuevaY<n-1 &&
+                   grid[nuevaY][nuevaX]==MURO)
+                {
+                    direcciones.push_back(i); // guardar dirección válida
+                }
             }
 
-            if(!dirs.empty()){
+            if(!direcciones.empty()){
                 // Elegir dirección aleatoria entre las válidas
-                int i=dirs[rand()%dirs.size()];
-                int nx=a.x+dx[i], ny=a.y+dy[i];
+                int dirElegida=direcciones[rand()%direcciones.size()];
+                int nuevaX=actual.x+movX[dirElegida];
+                int nuevaY=actual.y+movY[dirElegida];
 
                 // Abrir celda destino
-                grid[ny][nx]=CAMINO;
+                grid[nuevaY][nuevaX]=CAMINO;
                 // Abrir muro intermedio entre actual y destino
-                grid[a.y+dy[i]/2][a.x+dx[i]/2]=CAMINO;
+                grid[actual.y+movY[dirElegida]/2][actual.x+movX[dirElegida]/2]=CAMINO;
 
                 // Avanzar a la nueva celda
-                pila.push(Pos(nx,ny));
+                pila.push(Pos(nuevaX,nuevaY));
             } else {
                 // Si no hay vecinos válidos → retroceder
                 pila.pop();
@@ -88,41 +94,45 @@ public:
 
     // ================= RESOLVER LABERINTO CON BFS =================
     bool resolver() {
-        queue<Pos> q;                               // cola para BFS
-        vector<vector<bool>> vis(n,vector<bool>(n,false));   // matriz de visitados
-        vector<vector<Pos>> padre(n,vector<Pos>(n));         // matriz de padres para reconstruir camino
+        queue<Pos> cola;                           // cola para BFS
+        vector<vector<bool>> visitado(n,vector<bool>(n,false));   // matriz de visitados
+        vector<vector<Pos>> padre(n,vector<Pos>(n));              // matriz de padres para reconstruir camino
 
-        q.push(entrada); 
-        vis[entrada.y][entrada.x]=true;
+        cola.push(entrada); 
+        visitado[entrada.y][entrada.x]=true;
 
-        // Movimientos posibles: 4 direcciones
-        int dx[4]={0,1,0,-1}; // derecha, abajo, izquierda, arriba (x)
-        int dy[4]={-1,0,1,0}; // arriba, derecha, abajo, izquierda (y)
+        // Movimientos posibles: 4 direcciones (arriba, derecha, abajo, izquierda)
+        int movX[4]={0,1,0,-1};
+        int movY[4]={-1,0,1,0};
 
-        while(!q.empty()){
-            Pos a=q.front(); q.pop();
+        while(!cola.empty()){
+            Pos actual=cola.front(); cola.pop();
 
             // Si llegamos a la salida → reconstruir camino
-            if(a.x==salida.x && a.y==salida.y){
+            if(actual.x==salida.x && actual.y==salida.y){
                 solucion.clear();
-                while(!(a.x==entrada.x && a.y==entrada.y)){
-                    solucion.push_back(a);         // agregar posición actual al camino
-                    a=padre[a.y][a.x];            // retroceder usando "padre"
+                while(!(actual.x==entrada.x && actual.y==entrada.y)){
+                    solucion.push_back(actual);     // agregar posición actual al camino
+                    actual=padre[actual.y][actual.x]; // retroceder usando "padre"
                 }
                 solucion.push_back(entrada);       // agregar inicio al final
-                reverse(solucion.begin(),solucion.end()); // invertir camino para inicio→fin
+                reverse(solucion.begin(),solucion.end()); // invertir camino inicio→fin
                 return true;
             }
 
             // Explorar vecinos
             for(int i=0;i<4;i++){
-                int nx=a.x+dx[i], ny=a.y+dy[i];
+                int nuevaX=actual.x+movX[i];
+                int nuevaY=actual.y+movY[i];
+
                 // Si está dentro del laberinto, no visitado, y es CAMINO o SALIDA
-                if(nx>=0 && ny>=0 && nx<n && ny<n && !vis[ny][nx] &&
-                   (grid[ny][nx]==CAMINO || grid[ny][nx]==SALIDA)){
-                    vis[ny][nx]=true;         // marcar como visitado
-                    padre[ny][nx]=a;          // guardar padre
-                    q.push(Pos(nx,ny));       // añadir a la cola
+                if(nuevaX>=0 && nuevaY>=0 && nuevaX<n && nuevaY<n &&
+                   !visitado[nuevaY][nuevaX] &&
+                   (grid[nuevaY][nuevaX]==CAMINO || grid[nuevaY][nuevaX]==SALIDA))
+                {
+                    visitado[nuevaY][nuevaX]=true;   // marcar como visitado
+                    padre[nuevaY][nuevaX]=actual;   // guardar padre
+                    cola.push(Pos(nuevaX,nuevaY));  // añadir a la cola
                 }
             }
         }
@@ -132,16 +142,16 @@ public:
     // ================= MOSTRAR LABERINTO =================
     // conSol = true → mostrar camino solución
     void mostrar(bool conSol=false){
-        vector<vector<char>> temp=grid; // copia para no modificar el original
+        vector<vector<char>> copia=grid; // copia para no modificar el original
 
         if(conSol){
             for(auto&p:solucion)
-                if(temp[p.y][p.x]==CAMINO) temp[p.y][p.x]=SOLUCION; // marcar solución
+                if(copia[p.y][p.x]==CAMINO) copia[p.y][p.x]=SOLUCION; // marcar solución
         }
 
         // imprimir laberinto
         for(int i=0;i<n;i++){
-            for(int j=0;j<n;j++) cout<<temp[i][j]<<' ';
+            for(int j=0;j<n;j++) cout<<copia[i][j]<<' ';
             cout<<"\n";
         }
     }
@@ -152,9 +162,6 @@ int main(){
     srand(time(0)); // inicializar aleatoriedad con la hora actual
 
     // ==== PEDIR TAMAÑO AL USUARIO ====
- // Si el laberinto es menor a 5x5:
- //No hay suficiente espacio para colocar entrada, salida, caminos y muros intermedios.
- //Por ejemplo, un 3x3 tendría la entrada y salida tan cerca que el DFS no tendría sentido, y podrías no generar caminos correctamente.
     int tam;
     cout << "Introduce el tamaño del laberinto (impar >= 5): ";
     cin >> tam;
@@ -175,7 +182,6 @@ int main(){
     lab.generar();
     cout << "\n============================\n";
     cout << "LABERINTO GENERADO (" << tam << "x" << tam << "):\n\n"; 
-    // \n es un carácter de salto de línea. Cada vez que lo usas, la consola pasa a la siguiente línea.
     lab.mostrar(); // mostrar laberinto generado
     cout << "============================\n";
 
@@ -191,4 +197,3 @@ int main(){
 
     return 0;
 }
-
